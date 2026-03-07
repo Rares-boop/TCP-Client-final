@@ -25,7 +25,7 @@ public class VideoCallManager {
     private static final int VIDEO_WIDTH = 1280;
     private static final int VIDEO_HEIGHT = 720;
     private static final int MTU_LIMIT = 1400;
-    private static final int SERVER_VIDEO_PORT = 15557;
+    private final int serverVideoPort;
     private MediaCodec encoder;
     private MediaCodec decoder;
     private Surface encoderInputSurface;
@@ -41,10 +41,11 @@ public class VideoCallManager {
     private final java.util.concurrent.ConcurrentLinkedQueue<byte[]> decodedFramesQueue = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private volatile boolean isDecoderConfigured = false;
 
-    public VideoCallManager(String serverIp, int myId, Surface remoteSurface) {
+    public VideoCallManager(String serverIp, int myId, Surface remoteSurface, int serverVideoPort) {
         this.serverIp = serverIp;
         this.myId = myId;
         this.remoteSurface = remoteSurface;
+        this.serverVideoPort = serverVideoPort;
     }
 
     public void startVideo(int targetId, SecretKey key, DatagramSocket sharedVideoSocket) {
@@ -175,7 +176,7 @@ public class VideoCallManager {
 
             byte[] raw = packetBuf.array();
             if (videoSocket != null && !videoSocket.isClosed()) {
-                videoSocket.send(new DatagramPacket(raw, raw.length, addr, SERVER_VIDEO_PORT));
+                videoSocket.send(new DatagramPacket(raw, raw.length, addr, serverVideoPort));
             }
         }
     }

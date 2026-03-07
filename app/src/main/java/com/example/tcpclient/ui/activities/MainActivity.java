@@ -119,11 +119,15 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
+        pendingSpinner = null;
+        pendingRawUsers = null;
+
+        TcpConnection.setPacketListener(this::handlePacketOnUI);
+
         Socket socket = TcpConnection.socket;
         if (socket == null || socket.isClosed() || !socket.isConnected()) {
             attemptAutoReconnect();
         } else {
-            TcpConnection.setPacketListener(this::handlePacketOnUI);
             if(LocalStorage.getCurrentUserGroupChats().isEmpty()) {
                 refreshConversations();
             }

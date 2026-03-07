@@ -46,9 +46,17 @@ public class TcpConnection {
     private static PacketListener currentListener;
     private static Thread readingThread;
     private static volatile boolean isReading = false;
+    private static final java.util.concurrent.ConcurrentLinkedQueue<NetworkPacket> packetBuffer =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
 
     public static void setPacketListener(PacketListener listener) {
         currentListener = listener;
+        if (listener != null) {
+            NetworkPacket buffered;
+            while ((buffered = packetBuffer.poll()) != null) {
+                listener.onPacketReceived(buffered);
+            }
+        }
         Log.d(TAG, "Packet listener set: " + (listener == null ? "NULL" : listener.getClass().getSimpleName()));
     }
 
@@ -80,6 +88,7 @@ public class TcpConnection {
                     if (currentListener != null) {
                         currentListener.onPacketReceived(packet);
                     } else {
+                        packetBuffer.add(packet);
                         Log.w(TAG, "Packet ignored (no active listener for type): " + packet.getType());
                     }
                 }
@@ -91,14 +100,15 @@ public class TcpConnection {
         readingThread.start();
     }
     private static void handleIncomingCall(NetworkPacket packet) {
-        if (appContext == null) return;
-
+        if (appContext == null) {
+            return;
+        }
         int callerId = packet.getSenderId();
-        String callerName = "User " + callerId;
 
         ChatDtos.CallRequestDto incomingDto = new Gson().fromJson(packet.getPayload(), ChatDtos.CallRequestDto.class);
         int foundChatId = incomingDto.chatId;
 
+        String callerName = incomingDto.callerName != null ? incomingDto.callerName : "User " + callerId;
         Log.d(TAG, "Incoming Call from " + callerId + ". Chat ID found: " + foundChatId);
 
         String serverIp = "127.0.0.1";

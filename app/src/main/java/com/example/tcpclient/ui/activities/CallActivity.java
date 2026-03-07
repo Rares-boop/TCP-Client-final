@@ -157,7 +157,7 @@ public class CallActivity extends AppCompatActivity {
         SecretKey sessionKey = keyManager.getKey(currentChatId);
 
         if (sessionKey != null) {
-            voiceManager = new VoiceCallManager(this, serverIp, myUserId);
+            voiceManager = new VoiceCallManager(this, serverIp, myUserId, UDP_SERVER_AUDIO_PORT);
             voiceManager.startCall(targetUserId, sessionKey, audioSocket);
         } else { hangUp(); }
     }
@@ -176,7 +176,7 @@ public class CallActivity extends AppCompatActivity {
                 @Override
                 public void onSurfaceTextureAvailable(@NonNull android.graphics.SurfaceTexture surface, int w, int h) {
                     android.view.Surface s = new android.view.Surface(surface);
-                    videoManager = new VideoCallManager(serverIp, myUserId, s);
+                    videoManager = new VideoCallManager(serverIp, myUserId, s, UDP_SERVER_VIDEO_PORT);
                     videoManager.startVideo(targetUserId, sessionKey, videoSocket);
 
                     android.graphics.Matrix matrix = new android.graphics.Matrix();
@@ -274,7 +274,13 @@ public class CallActivity extends AppCompatActivity {
             try {
                 cameraProvider = cameraProviderFuture.get();
 
-                int rotation = getWindowManager().getDefaultDisplay().getRotation();
+                int rotation;
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    android.view.Display display = getDisplay();
+                    rotation = (display != null) ? display.getRotation() : android.view.Surface.ROTATION_0;
+                } else {
+                    rotation = getWindowManager().getDefaultDisplay().getRotation();
+                }
 
                 androidx.camera.core.resolutionselector.ResolutionSelector resolutionSelector =
                         new androidx.camera.core.resolutionselector.ResolutionSelector.Builder()

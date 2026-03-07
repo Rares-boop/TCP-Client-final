@@ -115,20 +115,11 @@ public class ConversationActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        TcpConnection.setPacketListener(null);
-        sendExitChatRequest();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        try {
-            NetworkPacket p = new NetworkPacket(PacketType.EXIT_CHAT_REQUEST, TcpConnection.getCurrentUserId());
-            TcpConnection.sendPacket(p);
-            TcpConnection.setPacketListener(null);
-        } catch (Exception e) {
-            Log.e(TAG, "Error during onDestroy cleanup", e);
-        }
     }
 
     private void handlePacketOnUI(NetworkPacket packet) {
@@ -225,10 +216,6 @@ public class ConversationActivity extends AppCompatActivity {
                     }
                     break;
 
-                case EXIT_CHAT_RESPONSE:
-                    finish();
-                    break;
-
                 case ENTER_CHAT_RESPONSE: break;
             }
         } catch (Exception e) {
@@ -298,9 +285,7 @@ public class ConversationActivity extends AppCompatActivity {
 
     public void handleBackPress() {
         sendExitChatRequest();
-        new android.os.Handler().postDelayed(() -> {
-            if (!isFinishing()) finish();
-        }, 2000);
+        finish();
     }
 
     private void scrollToBottom() {
@@ -399,7 +384,7 @@ public class ConversationActivity extends AppCompatActivity {
             Toast.makeText(this, "Server IP retrieval error!", Toast.LENGTH_SHORT).show();
         }
 
-        ChatDtos.CallRequestDto callDto = new ChatDtos.CallRequestDto(targetUserId, currentChatId, isAudioCall);
+        ChatDtos.CallRequestDto callDto = new ChatDtos.CallRequestDto(targetUserId, currentChatId, isAudioCall, chatName);
         NetworkPacket callRequest = new NetworkPacket(PacketType.CALL_REQUEST, TcpConnection.getCurrentUserId(), callDto);
         TcpConnection.sendPacket(callRequest);
 

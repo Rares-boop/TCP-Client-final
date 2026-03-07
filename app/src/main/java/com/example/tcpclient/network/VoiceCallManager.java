@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 import javax.crypto.SecretKey;
 
 public class VoiceCallManager {
-    private static final int SERVER_PORT = 15556;
+    private final int serverPort;
     private static final int SAMPLE_RATE = 16000;
     private static final int CHANNEL_CONFIG_IN = AudioFormat.CHANNEL_IN_MONO;
     private static final int CHANNEL_CONFIG_OUT = AudioFormat.CHANNEL_OUT_MONO;
@@ -37,10 +37,11 @@ public class VoiceCallManager {
     private static final String TAG = "VoiceCallManager";
     private AudioTrack speaker;
 
-    public VoiceCallManager(Context context, String serverIp, int myUserId) {
+    public VoiceCallManager(Context context, String serverIp, int myUserId, int serverPort) {
         this.context = context;
         this.serverIp = serverIp;
         this.myUserId = myUserId;
+        this.serverPort = serverPort;
     }
 
     public void startCall(int targetUserId, SecretKey sessionKey, DatagramSocket sharedAudioSocket) {
@@ -109,7 +110,7 @@ public class VoiceCallManager {
                             packetBuf.put(encryptedAudio);
 
                             byte[] packetData = packetBuf.array();
-                            DatagramPacket p = new DatagramPacket(packetData, packetData.length, serverAddress, SERVER_PORT);
+                            DatagramPacket p = new DatagramPacket(packetData, packetData.length, serverAddress, serverPort);
                             audioSocket.send(p);
                         }
                     }
