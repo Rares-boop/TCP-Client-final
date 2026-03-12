@@ -287,6 +287,24 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
                 break;
+
+            case CHECK_CHAT_EXISTS_RESPONSE:
+                boolean chatExists = gson.fromJson(packet.getPayload(), Boolean.class);
+
+                if (adapter != null) adapter.setEnabled(true);
+                if (dialog != null && dialog.isShowing()) dialog.dismiss();
+
+                if (chatExists) {
+                    Toast.makeText(this, "Chat already exists!", Toast.LENGTH_SHORT).show();
+                    refreshConversations();
+                } else {
+                    Toast.makeText(this, "Handshake: Requesting keys...", Toast.LENGTH_SHORT).show();
+                    NetworkPacket bundleReq = new NetworkPacket(PacketType.GET_BUNDLE_REQUEST,
+                            TcpConnection.getCurrentUserId(),
+                            new ChatDtos.GetBundleRequestDto(pendingChatTargetId));
+                    TcpConnection.sendPacket(bundleReq);
+                }
+                break;
         }
     }
 
@@ -412,10 +430,8 @@ public class MainActivity extends AppCompatActivity {
                     this.pendingChatTargetId = targetId;
                     this.pendingChatName = groupName;
 
-                    Toast.makeText(MainActivity.this, "Handshake: Requesting keys...", Toast.LENGTH_SHORT).show();
-
-                    NetworkPacket packet = new NetworkPacket(PacketType.GET_BUNDLE_REQUEST, TcpConnection.getCurrentUserId(), new ChatDtos.GetBundleRequestDto(targetId));
-                    TcpConnection.sendPacket(packet);
+                    NetworkPacket checkPacket = new NetworkPacket(PacketType.CHECK_CHAT_EXISTS_REQUEST, TcpConnection.getCurrentUserId(), targetId);
+                    TcpConnection.sendPacket(checkPacket);
                 }).create();
         dialog.setCancelable(false);
         dialog.setCanceledOnTouchOutside(false);
