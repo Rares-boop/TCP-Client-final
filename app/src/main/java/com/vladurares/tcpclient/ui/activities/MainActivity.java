@@ -38,6 +38,8 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.crypto.SecretKey;
+
 import chat.models.GroupChat;
 import chat.models.User;
 import chat.network.ChatDtos;
@@ -255,9 +257,14 @@ public class MainActivity extends AppCompatActivity {
                     } catch (Exception e) { Log.e(TAG, "Error generating new chat or saving cryptographic key.", e); }
                 }
                 else if (LocalStorage.pendingSecretKey != null) {
-                    keyMgr.saveKey(newChat.getId(), LocalStorage.pendingSecretKey);
+                    SecretKey existingKey = keyMgr.getKey(newChat.getId());
+                    if (existingKey == null) {
+                        keyMgr.saveKey(newChat.getId(), LocalStorage.pendingSecretKey);
+                        Log.i(TAG, "[ALICE] Key saved successfully from pending state!" );
+                    } else {
+                        Log.i(TAG, "[ALICE] Key already exists, not overwriting.");
+                    }
                     LocalStorage.pendingSecretKey = null;
-                    Log.i(TAG, "[ALICE] Key saved successfully from pending state!");
                 }
                 break;
 
@@ -287,23 +294,6 @@ public class MainActivity extends AppCompatActivity {
                 }
                 break;
 
-            case CHECK_CHAT_EXISTS_RESPONSE:
-                boolean chatExists = gson.fromJson(packet.getPayload(), Boolean.class);
-
-                if (adapter != null) adapter.setEnabled(true);
-                if (dialog != null && dialog.isShowing()) dialog.dismiss();
-
-                if (chatExists) {
-                    Toast.makeText(this, "Chat already exists!", Toast.LENGTH_SHORT).show();
-                    refreshConversations();
-                } else {
-                    Toast.makeText(this, "Handshake: Requesting keys...", Toast.LENGTH_SHORT).show();
-                    NetworkPacket bundleReq = new NetworkPacket(PacketType.GET_BUNDLE_REQUEST,
-                            TcpConnection.getCurrentUserId(),
-                            new ChatDtos.GetBundleRequestDto(pendingChatTargetId));
-                    TcpConnection.sendPacket(bundleReq);
-                }
-                break;
         }
     }
 
@@ -360,10 +350,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void handleChatClick(GroupChat chat) {
+        ClientKeyManager keyMgr = new ClientKeyManager(this, TcpConnection.getCurrentUserId());
+        SecretKey key = keyMgr.getKey(chat.getId());
+        if (key == null) {
+            Toast.makeText(this, "Key exchange in progress, please wait...", Toast.LENGTH_SHORT).show();
+            return;
+        }
         Intent intent = new Intent(this, ConversationActivity.class);
         intent.putExtra("CHAT_ID", chat.getId());
         intent.putExtra("CHAT_NAME", chat.getName());
-
         startActivity(intent);
     }
 
@@ -430,8 +425,11 @@ public class MainActivity extends AppCompatActivity {
                     this.pendingChatTargetId = targetId;
                     this.pendingChatName = groupName;
 
-                    NetworkPacket checkPacket = new NetworkPacket(PacketType.CHECK_CHAT_EXISTS_REQUEST, TcpConnection.getCurrentUserId(), targetId);
-                    TcpConnection.sendPacket(checkPacket);
+                    Toast.makeText(this, "Handshake: Requesting keys...", Toast.LENGTH_SHORT).show();
+                    NetworkPacket bundleReq = new NetworkPacket(PacketType.GET_BUNDLE_REQUEST,
+                            TcpConnection.getCurrentUserId(),
+                            new ChatDtos.GetBundleRequestDto(targetId));
+                    TcpConnection.sendPacket(bundleReq);
                 }).create();
         dialog.setCancelable(false);
         dialog.setCanceledOnTouchOutside(false);

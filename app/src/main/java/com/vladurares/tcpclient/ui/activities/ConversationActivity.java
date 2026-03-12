@@ -215,6 +215,16 @@ public class ConversationActivity extends AppCompatActivity {
                     }
                     break;
 
+                case DELETE_CHAT_BROADCAST:
+                    int deletedChatId = gson.fromJson(packet.getPayload(), Integer.class);
+                    if (deletedChatId == currentChatId) {
+                        runOnUiThread(() -> {
+                            Toast.makeText(this, "This chat was deleted!", Toast.LENGTH_SHORT).show();
+                            finish();
+                        });
+                    }
+                    break;
+
                 case ENTER_CHAT_RESPONSE: break;
             }
         } catch (Exception e) {
