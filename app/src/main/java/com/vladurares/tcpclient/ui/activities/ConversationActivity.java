@@ -80,7 +80,7 @@ public class ConversationActivity extends AppCompatActivity {
             }
         });
 
-        keyManager = new ClientKeyManager(this);
+        keyManager = new ClientKeyManager(this, TcpConnection.getCurrentUserId());
 
         Intent intent = getIntent();
         this.chatName = intent.getStringExtra("CHAT_NAME");

@@ -16,17 +16,31 @@ import javax.crypto.spec.SecretKeySpec;
 public class ClientKeyManager {
     private static final String TAG = "ClientKeyManager";
     private static final String PREF_FILE_NAME = "secure_chat_keys";
-    private static final String KEY_IK_PUB = "MY_IDENTITY_PUB_DILITHIUM";
-    private static final String KEY_IK_PRIV = "MY_IDENTITY_PRIV_DILITHIUM";
-    private static final String KEY_SPK_PUB = "MY_PREKEY_PUB_KYBER";
-    private static final String KEY_SPK_PRIV = "MY_PREKEY_PRIV_KYBER";
+    private final String KEY_IK_PUB;
+    private final String KEY_IK_PRIV;
+    private final String KEY_SPK_PUB;
+    private final String KEY_SPK_PRIV;
     private SharedPreferences securePrefs;
 
-    public ClientKeyManager(Context context) {
+    public ClientKeyManager(Context context, int userId) {
+        KEY_IK_PUB  = "MY_IDENTITY_PUB_DILITHIUM_"  + userId;
+        KEY_IK_PRIV = "MY_IDENTITY_PRIV_DILITHIUM_" + userId;
+        KEY_SPK_PUB = "MY_PREKEY_PUB_KYBER_"         + userId;
+        KEY_SPK_PRIV = "MY_PREKEY_PRIV_KYBER_"        + userId;
+
         try {
-            MasterKey masterKey = new MasterKey.Builder(context)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build();
+            MasterKey masterKey;
+            try {
+                masterKey = new MasterKey.Builder(context)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .setRequestStrongBoxBacked(true)
+                        .build();
+            } catch (Exception e) {
+                Log.w(TAG, "StrongBox unavailable, falling back to TEE");
+                masterKey = new MasterKey.Builder(context)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build();
+            }
 
             this.securePrefs = EncryptedSharedPreferences.create(
                     context,

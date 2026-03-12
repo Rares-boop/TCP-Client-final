@@ -143,7 +143,7 @@ public class RegisterActivity extends AppCompatActivity {
 
                     new Thread(() -> {
                         try {
-                            ClientKeyManager clientKeyManager = new ClientKeyManager(this);
+                            ClientKeyManager clientKeyManager = new ClientKeyManager(this, TcpConnection.getCurrentUserId());
 
                             KeyPair identityKP = CryptoHelper.generateDilithiumKeys();
                             KeyPair preKeyKP = CryptoHelper.generateKyberKeys();

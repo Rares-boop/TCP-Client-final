@@ -153,7 +153,7 @@ public class CallActivity extends AppCompatActivity {
     }
 
     private void initVoiceCall(int myUserId) {
-        ClientKeyManager keyManager = new ClientKeyManager(this);
+        ClientKeyManager keyManager = new ClientKeyManager(this, TcpConnection.getCurrentUserId());
         SecretKey sessionKey = keyManager.getKey(currentChatId);
 
         if (sessionKey != null) {
@@ -163,7 +163,7 @@ public class CallActivity extends AppCompatActivity {
     }
 
     private void initVideoCall(int myUserId) {
-        ClientKeyManager keyManager = new ClientKeyManager(this);
+        ClientKeyManager keyManager = new ClientKeyManager(this, TcpConnection.getCurrentUserId());
         SecretKey sessionKey = keyManager.getKey(currentChatId);
 
         if (sessionKey != null) {

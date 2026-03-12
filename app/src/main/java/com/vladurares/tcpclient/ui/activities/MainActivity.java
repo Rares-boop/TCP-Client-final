@@ -238,7 +238,7 @@ public class MainActivity extends AppCompatActivity {
                     Log.w(TAG, "[UI] Chat already exists in UI. Ignoring visual add.");
                 }
 
-                ClientKeyManager keyMgr = new ClientKeyManager(this);
+                ClientKeyManager keyMgr = new ClientKeyManager(this, TcpConnection.getCurrentUserId());
 
                 if (broadcastDto.keyCiphertext != null && !broadcastDto.keyCiphertext.isEmpty()) {
                     try {
@@ -247,7 +247,6 @@ public class MainActivity extends AppCompatActivity {
                         String myPrivStr = keyMgr.getMyPreKeyPrivateKey();
                         java.security.PrivateKey myPriv = CryptoHelper.stringToKyberPrivate(myPrivStr);
 
-                        // Decapsulate
                         javax.crypto.SecretKey shared = CryptoHelper.decapsulate(myPriv, cipherBytes);
                         String keyBase64 = android.util.Base64.encodeToString(shared.getEncoded(), android.util.Base64.NO_WRAP);
 
@@ -332,6 +331,7 @@ public class MainActivity extends AppCompatActivity {
             TcpConnection.stopReading();
             TcpConnection.close();
             runOnUiThread(() -> {
+                LocalStorage.setCurrentUserGroupChats(new ArrayList<>());
                 SharedPreferences prefs = SecureStorage.getEncryptedPrefs(MainActivity.this);
                 prefs.edit().clear().apply();
                 goToLogin();
