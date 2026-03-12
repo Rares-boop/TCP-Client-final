@@ -60,7 +60,8 @@ public class VoiceCallManager {
     private void setupSpeaker() {
         try {
             int minBuf = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT);
-            speaker = new AudioTrack(AudioManager.STREAM_MUSIC, SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT, minBuf, AudioTrack.MODE_STREAM);
+            int bufferSize = minBuf * 4;
+            speaker = new AudioTrack(AudioManager.STREAM_MUSIC, SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT, bufferSize, AudioTrack.MODE_STREAM);
             speaker.play();
         } catch (Exception e) {
             Log.e(TAG, "Speaker setup error: " + e.getMessage());
@@ -84,7 +85,7 @@ public class VoiceCallManager {
     private void startSending() {
         new Thread(() -> {
             int minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG_IN, AUDIO_FORMAT);
-            byte[] audioBuffer = new byte[640];
+            byte[] audioBuffer = new byte[minBuf * 2];
             AudioRecord recorder = null;
 
             try {
