@@ -116,7 +116,6 @@ public class MainActivity extends AppCompatActivity {
         TcpConnection.startReading();
     }
 
-    @SuppressLint("NotifyDataSetChanged")
     @Override
     protected void onResume() {
         super.onResume();
@@ -130,12 +129,7 @@ public class MainActivity extends AppCompatActivity {
         if (socket == null || socket.isClosed() || !socket.isConnected()) {
             attemptAutoReconnect();
         } else {
-            if(LocalStorage.getCurrentUserGroupChats().isEmpty()) {
-                refreshConversations();
-            }
-            else{
-                adapter.notifyDataSetChanged();
-            }
+            refreshConversations();
         }
     }
 

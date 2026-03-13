@@ -21,6 +21,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.vladurares.tcpclient.storage.LocalStorage;
 import com.vladurares.tcpclient.utils.ClientKeyManager;
 import com.vladurares.tcpclient.utils.ConfigReader;
 import com.vladurares.tcpclient.ui.adapters.MessageAdapter;
@@ -35,6 +36,7 @@ import java.util.List;
 
 import javax.crypto.SecretKey;
 
+import chat.models.GroupChat;
 import chat.models.Message;
 import chat.network.ChatDtos;
 import chat.network.NetworkPacket;
@@ -154,7 +156,7 @@ public class ConversationActivity extends AppCompatActivity {
 
                 case RECEIVE_MESSAGE:
                     Message msg = gson.fromJson(packet.getPayload(), Message.class);
-                    if (msg != null) {
+                    if (msg != null && msg.getGroupId() == this.currentChatId) {
                         try {
                             String decryptedText = CryptoHelper.unpackAndDecrypt(chatKey, msg.getContent());
                             msg.setContent(decryptedText.getBytes());
@@ -222,6 +224,50 @@ public class ConversationActivity extends AppCompatActivity {
                             Toast.makeText(this, "This chat was deleted!", Toast.LENGTH_SHORT).show();
                             finish();
                         });
+                    }
+                    break;
+
+                case CREATE_CHAT_BROADCAST:
+                    ChatDtos.NewChatBroadcastDto broadcastDto = gson.fromJson(packet.getPayload(), ChatDtos.NewChatBroadcastDto.class);
+                    if (broadcastDto.keyCiphertext != null && !broadcastDto.keyCiphertext.isEmpty()) {
+                        try {
+                            byte[] cipherBytes = android.util.Base64.decode(broadcastDto.keyCiphertext, android.util.Base64.NO_WRAP);
+                            String myPrivStr = keyManager.getMyPreKeyPrivateKey();
+                            java.security.PrivateKey myPriv = CryptoHelper.stringToKyberPrivate(myPrivStr);
+                            javax.crypto.SecretKey shared = CryptoHelper.decapsulate(myPriv, cipherBytes);
+                            String keyBase64 = android.util.Base64.encodeToString(shared.getEncoded(), android.util.Base64.NO_WRAP);
+                            keyManager.saveKey(broadcastDto.groupInfo.getId(), keyBase64);
+                            Log.i(TAG, "[BOB] Key saved from ConversationActivity!");
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error saving key in ConversationActivity", e);
+                        }
+                    }
+                    break;
+
+                case RENAME_CHAT_BROADCAST:
+                    try {
+                        ChatDtos.RenameGroupDto renameDto = gson.fromJson(packet.getPayload(), ChatDtos.RenameGroupDto.class);
+
+                        if (renameDto.chatId == currentChatId) {
+
+                            chatName = renameDto.newName;
+
+                            TextView txtChatName = findViewById(R.id.txtChatName);
+                            txtChatName.setText(chatName);
+
+                            List<GroupChat> globalChats = LocalStorage.getCurrentUserGroupChats();
+                            if (globalChats != null) {
+                                for (GroupChat chat : globalChats) {
+                                    if (chat.getId() == currentChatId) {
+                                        chat.setName(chatName);
+                                        break;
+                                    }
+                                }
+                            }
+                            Log.i(TAG, "Chat rename live in: " + chatName);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error RENAME_CHAT_BROADCAST in ConversationActivity", e);
                     }
                     break;
 

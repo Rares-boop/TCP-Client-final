@@ -39,6 +39,8 @@ public class CallActivity extends AppCompatActivity {
     private String serverIp;
     private androidx.camera.lifecycle.ProcessCameraProvider cameraProvider;
     private volatile boolean isCallActive = true;
+    private final com.google.gson.Gson gson = new com.google.gson.Gson();
+    private ClientKeyManager keyManager;
 
     @SuppressLint("SetTextI18n")
     @Override
@@ -63,6 +65,8 @@ public class CallActivity extends AppCompatActivity {
 
         FloatingActionButton btnEndCall = findViewById(R.id.btnEndCall);
         btnEndCall.setOnClickListener(v -> hangUp());
+
+        keyManager = new ClientKeyManager(this, myUserId);
     }
 
     private void startNetworkStack(int myId, int targetId) {
@@ -132,8 +136,51 @@ public class CallActivity extends AppCompatActivity {
 
     private void handlePacketOnUI(NetworkPacket packet) {
         runOnUiThread(() -> {
-            if (packet.getType() == PacketType.CALL_END || packet.getType() == PacketType.CALL_DENY) {
-                closeCallScreen();
+            try {
+                switch (packet.getType()) {
+                    case CALL_END:
+                    case CALL_DENY:
+                        android.widget.Toast.makeText(this, "Call ended by partner.", android.widget.Toast.LENGTH_SHORT).show();
+                        closeCallScreen();
+                        break;
+
+                    case DELETE_CHAT_BROADCAST:
+                        int deletedChatId = gson.fromJson(packet.getPayload(), Integer.class);
+                        if (deletedChatId == currentChatId) {
+                            android.widget.Toast.makeText(this, "Chat was deleted! Ending call.", android.widget.Toast.LENGTH_SHORT).show();
+                            closeCallScreen();
+                        }
+                        break;
+
+                    case RENAME_CHAT_BROADCAST:
+                        chat.network.ChatDtos.RenameGroupDto renameDto = gson.fromJson(packet.getPayload(),
+                                chat.network.ChatDtos.RenameGroupDto.class);
+                        if (renameDto.chatId == currentChatId) {
+                            TextView txtName = findViewById(R.id.txtCallName);
+                            if (txtName != null) {
+                                txtName.setText(renameDto.newName);
+                            }
+                            Log.i("CallActivity", "Call UI updated with new chat name: " + renameDto.newName);
+                        }
+                        break;
+
+                    case CREATE_CHAT_BROADCAST:
+                        chat.network.ChatDtos.NewChatBroadcastDto broadcastDto = gson.fromJson(packet.getPayload(),
+                                chat.network.ChatDtos.NewChatBroadcastDto.class);
+                        if (broadcastDto.keyCiphertext != null && !broadcastDto.keyCiphertext.isEmpty()) {
+                            byte[] cipherBytes = android.util.Base64.decode(broadcastDto.keyCiphertext, android.util.Base64.NO_WRAP);
+                            String myPrivStr = keyManager.getMyPreKeyPrivateKey();
+                            java.security.PrivateKey myPriv = chat.security.CryptoHelper.stringToKyberPrivate(myPrivStr);
+                            javax.crypto.SecretKey shared = chat.security.CryptoHelper.decapsulate(myPriv, cipherBytes);
+                            String keyBase64 = android.util.Base64.encodeToString(shared.getEncoded(), android.util.Base64.NO_WRAP);
+
+                            keyManager.saveKey(broadcastDto.groupInfo.getId(), keyBase64);
+                            Log.i("CallActivity", "[BOB] Background Key saved while in an active call!");
+                        }
+                        break;
+                }
+            } catch (Exception e) {
+                Log.e("CallActivity", "Error handling packet in CallActivity", e);
             }
         });
     }
