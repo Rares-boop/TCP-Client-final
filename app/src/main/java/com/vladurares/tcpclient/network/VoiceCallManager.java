@@ -8,6 +8,9 @@ import android.media.AudioManager;
 import android.media.AudioRecord;
 import android.media.AudioTrack;
 import android.media.MediaRecorder;
+import android.media.audiofx.AcousticEchoCanceler;
+import android.media.audiofx.AutomaticGainControl;
+import android.media.audiofx.NoiseSuppressor;
 import android.util.Log;
 
 import androidx.core.content.ContextCompat;
@@ -36,6 +39,9 @@ public class VoiceCallManager {
     private final Context context;
     private static final String TAG = "VoiceCallManager";
     private AudioTrack speaker;
+    private AcousticEchoCanceler aec;
+    private NoiseSuppressor ns;
+    private AutomaticGainControl agc;
 
     public VoiceCallManager(Context context, String serverIp, int myUserId, int serverPort) {
         this.context = context;
@@ -59,9 +65,13 @@ public class VoiceCallManager {
 
     private void setupSpeaker() {
         try {
+            AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            audioManager.setSpeakerphoneOn(true);
+
             int minBuf = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT);
             int bufferSize = minBuf * 4;
-            speaker = new AudioTrack(AudioManager.STREAM_MUSIC, SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT, bufferSize, AudioTrack.MODE_STREAM);
+            speaker = new AudioTrack(AudioManager.STREAM_VOICE_CALL, SAMPLE_RATE, CHANNEL_CONFIG_OUT, AUDIO_FORMAT, bufferSize, AudioTrack.MODE_STREAM);
             speaker.play();
         } catch (Exception e) {
             Log.e(TAG, "Speaker setup error: " + e.getMessage());
@@ -95,6 +105,24 @@ public class VoiceCallManager {
                 }
 
                 recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, CHANNEL_CONFIG_IN, AUDIO_FORMAT, minBuf);
+
+                int audioSessionId = recorder.getAudioSessionId();
+
+                if (AcousticEchoCanceler.isAvailable()) {
+                    aec = AcousticEchoCanceler.create(audioSessionId);
+                    if (aec != null) aec.setEnabled(true);
+                }
+
+                if (NoiseSuppressor.isAvailable()) {
+                    ns = NoiseSuppressor.create(audioSessionId);
+                    if (ns != null) ns.setEnabled(true);
+                }
+
+                if (AutomaticGainControl.isAvailable()) {
+                    agc = AutomaticGainControl.create(audioSessionId);
+                    if (agc != null) agc.setEnabled(true);
+                }
+
                 recorder.startRecording();
 
                 InetAddress serverAddress = InetAddress.getByName(serverIp);
@@ -102,7 +130,10 @@ public class VoiceCallManager {
                 while (isCallActive) {
                     int read = recorder.read(audioBuffer, 0, audioBuffer.length);
                     if (read > 0) {
-                        byte[] encryptedAudio = UdpCryptoUtils.encrypt(ramSessionKey, audioBuffer);
+                        byte[] actualAudio = new byte[read];
+                        System.arraycopy(audioBuffer, 0, actualAudio, 0, read);
+
+                        byte[] encryptedAudio = UdpCryptoUtils.encrypt(ramSessionKey, actualAudio);
 
                         if (encryptedAudio != null && audioSocket != null && !audioSocket.isClosed()) {
                             ByteBuffer packetBuf = ByteBuffer.allocate(8 + encryptedAudio.length);
@@ -137,6 +168,28 @@ public class VoiceCallManager {
             try { speaker.stop(); speaker.release(); } catch (Exception ignored) {}
             speaker = null;
         }
+
+        if (aec != null) {
+            try { aec.release(); } catch (Exception ignored) {}
+            aec = null;
+        }
+        if (ns != null) {
+            try { ns.release(); } catch (Exception ignored) {}
+            ns = null;
+        }
+        if (agc != null) {
+            try { agc.release(); } catch (Exception ignored) {}
+            agc = null;
+        }
+
+        try {
+            AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            audioManager.setMode(AudioManager.MODE_NORMAL);
+            audioManager.setSpeakerphoneOn(false);
+        } catch (Exception e) {
+            Log.e(TAG, "Error resetting AudioManager: " + e.getMessage());
+        }
+
         Log.d(TAG, "Call ended cleanly in Voice Manager.");
     }
 }

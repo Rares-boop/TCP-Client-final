@@ -67,22 +67,28 @@ public class CallActivity extends AppCompatActivity {
         btnEndCall.setOnClickListener(v -> hangUp());
 
         keyManager = new ClientKeyManager(this, myUserId);
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
     private void startNetworkStack(int myId, int targetId) {
         new Thread(() -> {
             try {
                 if (initUdpSockets()) {
-                    startAudioReceiver();
-                    startVideoReceiver();
+                    isCallActive = true;
                     startPeriodicHolePunch(myId, targetId);
 
                     boolean isAudioOnly = getIntent().getBooleanExtra("IS_AUDIO", true);
                     runOnUiThread(() -> {
-                        initVoiceCall(myId);
-                        if (!isAudioOnly) {
-                            initVideoCall(myId);
-                        }
+                        new android.os.Handler().postDelayed(() -> {
+                            if (!isCallActive) return;
+
+                            initVoiceCall(myId);
+                            if (!isAudioOnly) {
+                                initVideoCall(myId);
+                            }
+                            startAudioReceiver();
+                            startVideoReceiver();
+                        }, 500);
                     });
                 }
             } catch (Exception e) { Log.e("UDP", "Failed", e); }
@@ -108,6 +114,12 @@ public class CallActivity extends AppCompatActivity {
                 InetAddress serverAddr = InetAddress.getByName(serverIp);
                 DatagramPacket audioPunch = new DatagramPacket(data, data.length, serverAddr, UDP_SERVER_AUDIO_PORT);
                 DatagramPacket videoPunch = new DatagramPacket(data, data.length, serverAddr, UDP_SERVER_VIDEO_PORT);
+
+                for (int i = 0; i < 5; i++) {
+                    if (audioSocket != null && !audioSocket.isClosed()) audioSocket.send(audioPunch);
+                    if (videoSocket != null && !videoSocket.isClosed()) videoSocket.send(videoPunch);
+                    Thread.sleep(200);
+                }
 
                 while (isCallActive) {
                     if (audioSocket != null && !audioSocket.isClosed()) {
@@ -275,7 +287,7 @@ public class CallActivity extends AppCompatActivity {
 
     private void startAudioReceiver() {
         new Thread(() -> {
-            byte[] buffer = new byte[8192];
+            byte[] buffer = new byte[65000];
             while (audioSocket != null && !audioSocket.isClosed()) {
                 try {
                     DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
