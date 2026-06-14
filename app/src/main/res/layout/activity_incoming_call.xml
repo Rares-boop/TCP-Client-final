@@ -109,5 +109,20 @@
 
     </LinearLayout>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    <TextView
+        android:id="@+id/txtEncrypted"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:text="End-to-End Encrypted"
+        android:textColor="#94A3B8"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:drawablePadding="6dp"
+        app:drawableStartCompat="@android:drawable/ic_secure"
+        app:drawableTint="#22C55E"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
+</androidx.constraintlayout.widget.ConstraintLayout>

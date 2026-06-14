@@ -66,6 +66,20 @@ public class CallActivity extends AppCompatActivity {
         FloatingActionButton btnEndCall = findViewById(R.id.btnEndCall);
         btnEndCall.setOnClickListener(v -> hangUp());
 
+        boolean[] isMuted = {false};
+        FloatingActionButton btnMute = findViewById(R.id.btnMute);
+        btnMute.setOnClickListener(v -> {
+            isMuted[0] = !isMuted[0];
+            if (voiceManager != null) {
+                voiceManager.setMuted(isMuted[0]);
+            }
+            btnMute.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(
+                            isMuted[0] ? 0xFF4A90D9 : 0xFF1E3A52
+                    )
+            );
+        });
+
         keyManager = new ClientKeyManager(this, myUserId);
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
@@ -78,18 +92,16 @@ public class CallActivity extends AppCompatActivity {
                     startPeriodicHolePunch(myId, targetId);
 
                     boolean isAudioOnly = getIntent().getBooleanExtra("IS_AUDIO", true);
-                    runOnUiThread(() -> {
-                        new android.os.Handler().postDelayed(() -> {
-                            if (!isCallActive) return;
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                        if (!isCallActive) return;
 
-                            initVoiceCall(myId);
-                            if (!isAudioOnly) {
-                                initVideoCall(myId);
-                            }
-                            startAudioReceiver();
-                            startVideoReceiver();
+                        initVoiceCall(myId);
+                        if (!isAudioOnly) {
+                            initVideoCall(myId);
+                        }
+                        startAudioReceiver();
+                        startVideoReceiver();
                         }, 500);
-                    });
                 }
             } catch (Exception e) { Log.e("UDP", "Failed", e); }
         }).start();
@@ -99,8 +111,21 @@ public class CallActivity extends AppCompatActivity {
         try {
             audioSocket = new DatagramSocket();
             videoSocket = new DatagramSocket();
+
+            try { audioSocket.setSendBufferSize(256 * 1024); } catch (Exception ignored) {}
+            try { videoSocket.setSendBufferSize(1024 * 1024); } catch (Exception ignored) {}
+            try { audioSocket.setReceiveBufferSize(256 * 1024); } catch (Exception ignored) {}
+            try { videoSocket.setReceiveBufferSize(1024 * 1024); } catch (Exception ignored) {}
+            try { audioSocket.setReuseAddress(true); } catch (Exception ignored) {}
+            try { videoSocket.setReuseAddress(true); } catch (Exception ignored) {}
+            try { audioSocket.setTrafficClass(0xB8); } catch (Exception ignored) {}
+            try { videoSocket.setTrafficClass(0x88); } catch (Exception ignored) {}
+
             return true;
-        } catch (Exception e) { return false; }
+        } catch (Exception e) {
+            Log.e("UDP", "Socket init failed", e);
+            return false;
+        }
     }
 
     private void startPeriodicHolePunch(int myId, int targetId) {
@@ -212,8 +237,7 @@ public class CallActivity extends AppCompatActivity {
     }
 
     private void initVoiceCall(int myUserId) {
-        ClientKeyManager keyManager = new ClientKeyManager(this, TcpConnection.getCurrentUserId());
-        SecretKey sessionKey = keyManager.getKey(currentChatId);
+        SecretKey sessionKey = this.keyManager.getKey(currentChatId);
 
         if (sessionKey != null) {
             voiceManager = new VoiceCallManager(this, serverIp, myUserId, UDP_SERVER_AUDIO_PORT);
@@ -222,11 +246,11 @@ public class CallActivity extends AppCompatActivity {
     }
 
     private void initVideoCall(int myUserId) {
-        ClientKeyManager keyManager = new ClientKeyManager(this, TcpConnection.getCurrentUserId());
-        SecretKey sessionKey = keyManager.getKey(currentChatId);
+        SecretKey sessionKey = this.keyManager.getKey(currentChatId);
 
         if (sessionKey != null) {
             findViewById(R.id.remoteVideo).setVisibility(android.view.View.VISIBLE);
+            findViewById(R.id.cardPreview).setVisibility(android.view.View.VISIBLE);
             findViewById(R.id.previewView).setVisibility(android.view.View.VISIBLE);
             findViewById(R.id.cardAvatar).setVisibility(android.view.View.GONE);
 

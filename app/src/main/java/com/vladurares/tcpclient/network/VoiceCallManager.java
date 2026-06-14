@@ -42,6 +42,7 @@ public class VoiceCallManager {
     private AcousticEchoCanceler aec;
     private NoiseSuppressor ns;
     private AutomaticGainControl agc;
+    private volatile  boolean isMuted = false;
 
     public VoiceCallManager(Context context, String serverIp, int myUserId, int serverPort) {
         this.context = context;
@@ -78,6 +79,10 @@ public class VoiceCallManager {
         }
     }
 
+    public void setMuted(boolean muted) {
+        this.isMuted = muted;
+    }
+
     public void receiveAudioData(byte[] encryptedData) {
         if (!isCallActive || speaker == null) return;
         try {
@@ -95,7 +100,8 @@ public class VoiceCallManager {
     private void startSending() {
         new Thread(() -> {
             int minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG_IN, AUDIO_FORMAT);
-            byte[] audioBuffer = new byte[minBuf * 2];
+            int bufferSize = minBuf * 2;
+            byte[] audioBuffer = new byte[640];
             AudioRecord recorder = null;
 
             try {
@@ -104,7 +110,7 @@ public class VoiceCallManager {
                     return;
                 }
 
-                recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, CHANNEL_CONFIG_IN, AUDIO_FORMAT, minBuf);
+                recorder = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, CHANNEL_CONFIG_IN, AUDIO_FORMAT, bufferSize);
 
                 int audioSessionId = recorder.getAudioSessionId();
 
@@ -129,9 +135,15 @@ public class VoiceCallManager {
 
                 while (isCallActive) {
                     int read = recorder.read(audioBuffer, 0, audioBuffer.length);
+
+                    if (isMuted) {
+                        continue;
+                    }
+
                     if (read > 0) {
                         byte[] actualAudio = new byte[read];
                         System.arraycopy(audioBuffer, 0, actualAudio, 0, read);
+
 
                         byte[] encryptedAudio = UdpCryptoUtils.encrypt(ramSessionKey, actualAudio);
 

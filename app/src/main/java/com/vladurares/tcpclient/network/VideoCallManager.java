@@ -67,9 +67,9 @@ public class VideoCallManager {
         try {
             MediaFormat format = MediaFormat.createVideoFormat(MIME_TYPE, VIDEO_WIDTH, VIDEO_HEIGHT);
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
-            format.setInteger(MediaFormat.KEY_BIT_RATE, 2500000);
+            format.setInteger(MediaFormat.KEY_BIT_RATE, 800000);
             format.setInteger(MediaFormat.KEY_FRAME_RATE, 25);
-            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2);
+            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
 
             encoder = MediaCodec.createEncoderByType(MIME_TYPE);
             encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
@@ -156,10 +156,10 @@ public class VideoCallManager {
             }
         }).start();
     }
-
+    private final java.util.concurrent.atomic.AtomicInteger frameCounter = new java.util.concurrent.atomic.AtomicInteger(0);
     private void sliceAndSend(byte[] fullData, InetAddress addr) throws Exception {
         int totalSlices = (int) Math.ceil((double) fullData.length / MTU_LIMIT);
-        int currentFrameId = (int) (System.currentTimeMillis() & 0x7FFFFFFF);
+        int currentFrameId = frameCounter.incrementAndGet();
 
         for (int i = 0; i < totalSlices; i++) {
             int start = i * MTU_LIMIT;
@@ -246,8 +246,9 @@ public class VideoCallManager {
         synchronized (frameCollector) {
             if (!frameCollector.containsKey(frameId)) {
                 if (frameCollector.size() > 30) {
-                    frameCollector.clear();
-                    sliceCounter.clear();
+                    Integer oldestKey = frameCollector.keySet().iterator().next();
+                    frameCollector.remove(oldestKey);
+                    sliceCounter.remove(oldestKey);
                 }
                 frameCollector.put(frameId, new byte[totalSlices][]);
                 sliceCounter.put(frameId, 0);
@@ -323,18 +324,23 @@ public class VideoCallManager {
                     return;
                 }
             }
-            decodedFramesQueue.add(clearData);
+            if (decodedFramesQueue.size() < 10) {
+                decodedFramesQueue.add(clearData);
+            }
+
             return;
         }
 
         if (isDecoderConfigured) {
-            decodedFramesQueue.add(clearData);
+            if (decodedFramesQueue.size() < 10) {
+                decodedFramesQueue.add(clearData);
+            }
         }
     }
 
     public void endVideo() {
         isVideoActive = false;
-        try { Thread.sleep(200); } catch (InterruptedException ignored) {}
+//        try { Thread.sleep(100); } catch (InterruptedException ignored) {}
 
         videoSocket = null;
         isDecoderConfigured = false;
